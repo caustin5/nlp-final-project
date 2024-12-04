@@ -8,7 +8,6 @@
 #   - improve checking answer function (speed / logic is eh)
 #   - code linting because this is bad lol 
 
-import os
 import argparse
 import transformers
 from transformers import AutoTokenizer, AutoModelForCausalLM
@@ -275,7 +274,7 @@ def main():
         ans = check_response(response,answer)
         counts[ans] += 1
     
-    outpath = argvs.output + '/' + argvs.model + '-' + 'results'
+    outpath = argvs.out + '/' + argvs.model + '-' + 'results'
     # TODO: Save test outputs. 
     with open(outpath, 'w') as f:
         for key, value in counts.items():
