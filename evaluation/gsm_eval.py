@@ -16,9 +16,11 @@ import torch
 import re
 import random
 import json
+import time
 from tqdm import tqdm
-from torch.cuda.amp import autocast
 from huggingface_hub import login
+from torch.amp import autocast
+
 
 ### CoT Prompt String. 
 preamble = "As an expert problem solver, solve step by step the following mathematical questions."
@@ -70,12 +72,11 @@ VALID_CORRECT = "<vc>"
 VALID_INCORRECT = "<vi>"
 NUM_RE = re.compile(r"-?\d+[\d,]*\.?\d*")
 TEST_RE = re.compile(r"#### (\-?[0-9\.\,]+)")
-HF_TOKEN = "" # replace with your hf login token :)
+HF_TOKEN = "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" # replace with your hf login token :)
 MAX_TOKENS = 1024
 DEVICE = 'cuda'
-DEBUGGING = False
-SEED = 23 # pick any here idk 
-SAMPLES = 20
+SEED = 58 # pick any here idk 
+SAMPLES = 25 #TODO: Change this
 GSM8K_DATA = './data/gsm8k_test.jsonl'
 
 def parse_args():
@@ -83,7 +84,7 @@ def parse_args():
     parser.add_argument(
         "--model",
         type=str,
-        default="google/gemma-7b-it",
+        default="google/gemma-2-2b-it",
         help="hf model-name",
     )
     # TODO (cdz) : this isn't used; maybe just use the json path?
@@ -114,6 +115,18 @@ def parse_args():
         help="don't quantize model"
     )
 
+    parser.add_argument(
+        "--t",
+        default='0',
+        help='extension to add to saved filename'
+    )
+
+    parser.add_argument(
+        '--samples',
+        type=int,
+        help='Set the number of samples',
+        default=SAMPLES
+    )
 
     argvs = parser.parse_args()
     return argvs
@@ -125,7 +138,7 @@ def load_model(hf_name,hf_token=HF_TOKEN,dq=False):
     login(hf_token)
     print('-'*25+'Loading Model: ' + hf_name + ' '+ '-'*25)
     tokenizer = AutoTokenizer.from_pretrained(hf_name)
-    model = AutoModelForCausalLM.from_pretrained(hf_name)
+    model = AutoModelForCausalLM.from_pretrained(hf_name,torch_dtype=torch.float16)
     if not dq:
         model.half()
     print("Loading device to cuda.... ")
@@ -219,21 +232,32 @@ def infer(model, tokenizer, prompt):
     torch.cuda.empty_cache() # just in case 
     model_inputs = tokenizer([prompt], return_tensors="pt").to(DEVICE)
 
+
+    # Time inference.
+    # start_time_inference = time.time()
     with torch.no_grad():
-        # infer
         generated_ids = model.generate(**model_inputs, max_new_tokens=MAX_TOKENS,
                                         do_sample=False, num_return_sequences=1)
-        
-        # Decode and return
-        result = tokenizer.batch_decode(generated_ids)[0]
-        return result
 
-def pick_samples(questions, s=True):
+    # End timing 
+    # end_time_inference = time.time()
+    # inference_time = end_time_inference - start_time_inference
+    # print(f"Inference Time: {inference_time:.4f} seconds")
+
+    # Decode the generated ids and return the result
+
+    input_length = model_inputs['input_ids'].shape[1]
+    result = tokenizer.decode(generated_ids[0][input_length:])
+    return result
+
+def pick_samples(questions, s=False):
     '''
     pick #SAMPLES from all gsm8k questions.  
     args:
     bool s : whether to seed or not
     '''
+    # TODO: toggle on/off seeding.
+
     if s: # should probably be false for actual data collection. 
         random.seed(SEED)
     # question answer pairs
@@ -241,9 +265,18 @@ def pick_samples(questions, s=True):
     return qaps
 
 def main():
+    global SAMPLES
+    
     argvs = parse_args()
     model,tokenizer = load_model(argvs.model,dq=argvs.dq)
     qa_combos = []
+    DEBUGGING = argvs.debug
+    SAMPLES = argvs.samples
+
+    split_modname = argvs.model.split('/')
+    save_modname = split_modname[1].strip()
+    os.makedirs(argvs.out,exist_ok=True)
+    outpath = argvs.out + '/' +save_modname +'_'+ str(SAMPLES)+ '_symb_'+ argvs.t
 
     # jsonl file; bit different than json
     with open(GSM8K_DATA, 'r') as file:
@@ -266,7 +299,7 @@ def main():
         response = infer(model,tokenizer,prompt)
         if DEBUGGING:
             print('-'*25 + 'DEBUG MODEL RESPONSE' + '-'*25)
-            print('Question :' + question)
+            print('Question :' + prompt)
             print('Model Response: ' + response)
             print('Answer: ' + answer)
             print(' CORRECT? : ' + check_response(response,answer))
@@ -274,8 +307,6 @@ def main():
         ans = check_response(response,answer)
         counts[ans] += 1
     
-    outpath = argvs.output + '/' + argvs.model + '-' + 'results'
-    # TODO: Save test outputs. 
     with open(outpath, 'w') as f:
         for key, value in counts.items():
             f.write(f"{key}: {value}\n")
