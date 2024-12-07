@@ -17,6 +17,8 @@ from tqdm import tqdm
 from huggingface_hub import login
 from torch.amp import autocast
 
+import sys
+sys.path.insert(1, '..')
 from templates import Template, create_templates
 
 
@@ -113,6 +115,7 @@ def parse_args():
         help="don't quantize model"
     )
 
+    # deprecated. 
     parser.add_argument(
         "--t",
         default='0',
@@ -288,16 +291,17 @@ def main(argvs,i):
     isDecoder = True if any(x in argvs.model.split('/')[1].lower() for x in
                              ('llama','gemma')) else False
 
+    NUM_SAMPS = 2
+
     split_modname = argvs.model.split('/')
     save_modname = split_modname[1].strip()
     os.makedirs(argvs.out,exist_ok=True)
     outpath = argvs.out + '/' +save_modname +'_'+ str(SAMPLES)+ '_symb_'+ str(i) + '.txt'
 
-
     # jsonl file; bit different than json
     temps = create_templates()
     for temp in temps:
-        for i in range(3):
+        for i in range(NUM_SAMPS):
             sampleqa = temp.generate_question()
             q = sampleqa[0]
             n = TEST_RE.search(sampleqa[1])
@@ -307,7 +311,19 @@ def main(argvs,i):
 
     tests = qa_combos
 
-    
+    file_name = './data/symbolic_templates_26-50.json'
+    with open(file_name,'r') as f:
+        loaded_data=json.load(f)
+    # for each of the 25 templates, pick NUM_SAMPS
+    for i in range(25):
+        j = 0
+        indxs = [i for i in range(1,51)]
+        while j < NUM_SAMPS:
+            choice = random.choice(indxs)
+            indxs.remove(choice)
+            tests.append((loaded_data[i]['question_'+str(choice)],loaded_data[i]['answer_'+str(choice)]))
+            j += 1
+        
     counts = {VALID_CORRECT: 0, VALID_INCORRECT:0, INVALD_RESPONSE:0}
     print('Beginning testing...')
 
@@ -331,7 +347,7 @@ def main(argvs,i):
         for key, value in counts.items():
             f.write(f"{key}: {value}\n")
 
-    print('done!')
+    print('#'*25 + ' Trial Done ' + '#'*25)
 
 if __name__ == "__main__":
     ### cli functionality here. 
@@ -342,6 +358,6 @@ if __name__ == "__main__":
     else:
         i = 0
         while i < loop:
-            print(i)
+            print(f'Trial : {i}')
             main(argvs,i)
             i += 1

@@ -1,12 +1,6 @@
 ''' (cdz) cmsc723 final 2024 '''
 
-# let's see how llm's handle basic math! 
-
-# possible improvements: 
-#   - returning model output rather than just invalid/valid-correct/valid-incorrect
-#     to see just how wrong the models are
-#   - improve checking answer function (speed / logic is eh)
-#   - code linting because this is bad lol 
+# This script batches prompts and infers, rather than going one prompt at a time. 
 
 import os
 import argparse
@@ -16,15 +10,17 @@ import torch
 import re
 import random
 import json
+import time
+import typing
+from collections.abc import Sequence
 from tqdm import tqdm
-from torch.cuda.amp import autocast
 from huggingface_hub import login
+from torch.amp import autocast
 
 import sys
-# caution: path[0] is reserved for script path (or '' in REPL)
 sys.path.insert(1, '..')
-
 from templates import Template, create_templates
+
 
 ### CoT Prompt String. 
 preamble = "As an expert problem solver, solve step by step the following mathematical questions."
@@ -76,7 +72,7 @@ VALID_CORRECT = "<vc>"
 VALID_INCORRECT = "<vi>"
 NUM_RE = re.compile(r"-?\d+[\d,]*\.?\d*")
 TEST_RE = re.compile(r"#### (\-?[0-9\.\,]+)")
-HF_TOKEN = "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" # replace with your hf login token :)
+HF_TOKEN = "" # replace with your hf login token :)
 MAX_TOKENS = 1024
 DEVICE = 'cuda'
 SEED = 58 # pick any here idk 
@@ -119,16 +115,24 @@ def parse_args():
         help="don't quantize model"
     )
 
+    # deprecated. 
     parser.add_argument(
         "--t",
         default='0',
         help='extension to add to saved filename'
     )
+
     parser.add_argument(
         '--samples',
         type=int,
         help='Set the number of samples',
         default=SAMPLES
+    )
+    parser.add_argument(
+        "--l",
+        type=int,
+        default=0,
+        help="number of loops"
     )
 
     argvs = parser.parse_args()
@@ -144,6 +148,10 @@ def load_model(hf_name,hf_token=HF_TOKEN,dq=False):
     model = AutoModelForCausalLM.from_pretrained(hf_name,torch_dtype=torch.float16)
     if not dq:
         model.half()
+
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+        
     print("Loading device to cuda.... ")
     model.to(DEVICE)
     print("Done loading to cuda!")
@@ -223,35 +231,41 @@ def create_prompt(question):
     that has as question with no whitespace)
     '''
     # just in case, TODO remove (cdz)
-    question = question.strip()
-
-    prompt = COT_PROMPT + 'Q: ' + question + "\n" + "A: " + LTSBS
+    for q in question : q.strip()
+    prompt = []
+    for q in question : prompt.append(COT_PROMPT + 'Q: ' + q + "\n" + "A: " + LTSBS)
     return prompt
 
-def infer(model, tokenizer, prompt): 
+def infer(model : AutoModelForCausalLM, tokenizer : AutoTokenizer, prompt : Sequence, left=False): 
     '''
-    generate the response. 
+    batch + gen response 
     '''
     torch.cuda.empty_cache() # just in case 
-    model_inputs = tokenizer([prompt], return_tensors="pt").to(DEVICE)
-
+    if left:
+        model_inputs = tokenizer(prompt, return_tensors="pt",padding_side='left',
+                                 padding=True,truncation=True).to(DEVICE)
+    else:
+        model_inputs = tokenizer(prompt, return_tensors="pt",
+                                 padding=True,truncation=True).to(DEVICE)
 
     # Time inference.
     # start_time_inference = time.time()
     with torch.no_grad():
         generated_ids = model.generate(**model_inputs, max_new_tokens=MAX_TOKENS,
-                                        do_sample=False, num_return_sequences=1)
+                                        do_sample=False, num_return_sequences=1,
+                                        eos_token_id=tokenizer.eos_token_id,
+                                        early_stopping=True)
 
-    # End timing 
-    # end_time_inference = time.time()
-    # inference_time = end_time_inference - start_time_inference
-    # print(f"Inference Time: {inference_time:.4f} seconds")
+    results = remove_prompt(prompt,model_inputs,tokenizer,generated_ids)
+    return results
 
-    # Decode the generated ids and return the result
-
-    input_length = model_inputs['input_ids'].shape[1]
-    result = tokenizer.decode(generated_ids[0][input_length:])
-    return result
+def remove_prompt(prompts, model_inputs, tokenizer, generated_ids):
+    results = []
+    for i, prompt in enumerate(prompts):
+        input_length = model_inputs['input_ids'][i].shape[0]
+        result = tokenizer.decode(generated_ids[i][input_length:])
+        results.append(result)
+    return results
 
 def pick_samples(questions, s=False):
     '''
@@ -267,25 +281,27 @@ def pick_samples(questions, s=False):
     qaps = random.sample(questions, SAMPLES)
     return qaps
 
-def main():
+def main(argvs,i):
     global SAMPLES
 
-    argvs = parse_args()
     model,tokenizer = load_model(argvs.model,dq=argvs.dq)
     qa_combos = []
     DEBUGGING = argvs.debug
     SAMPLES = argvs.samples
+    isDecoder = True if any(x in argvs.model.split('/')[1].lower() for x in
+                             ('llama','gemma')) else False
+
+    NUM_SAMPS = 2
 
     split_modname = argvs.model.split('/')
     save_modname = split_modname[1].strip()
     os.makedirs(argvs.out,exist_ok=True)
-    outpath = argvs.out + '/' +save_modname +'_'+ str(SAMPLES)+ '_symb_'+ argvs.t
-
+    outpath = argvs.out + '/' +save_modname +'_'+ str(SAMPLES)+ '_symb_'+ str(i) + '.txt'
 
     # jsonl file; bit different than json
     temps = create_templates()
     for temp in temps:
-        for i in range(50):
+        for i in range(NUM_SAMPS):
             sampleqa = temp.generate_question()
             q = sampleqa[0]
             n = TEST_RE.search(sampleqa[1])
@@ -293,32 +309,55 @@ def main():
             a = a.replace(",", "")
             qa_combos.append((q,a))
 
-    tests = pick_samples(qa_combos)
+    tests = qa_combos
 
-    print("did it")
+    file_name = './data/symbolic_templates_26-50.json'
+    with open(file_name,'r') as f:
+        loaded_data=json.load(f)
+    # for each of the 25 templates, pick NUM_SAMPS
+    for i in range(25):
+        j = 0
+        indxs = [i for i in range(1,51)]
+        while j < NUM_SAMPS:
+            choice = random.choice(indxs)
+            indxs.remove(choice)
+            tests.append((loaded_data[i]['question_'+str(choice)],loaded_data[i]['answer_'+str(choice)]))
+            j += 1
+        
     counts = {VALID_CORRECT: 0, VALID_INCORRECT:0, INVALD_RESPONSE:0}
+    print('Beginning testing...')
 
-    for test in tqdm(tests):
-        question = test[0]
-        answer = test[1]
-        prompt = create_prompt(question)
-        response = infer(model,tokenizer,prompt)
-        if DEBUGGING:
-            print('-'*25 + 'DEBUG MODEL RESPONSE' + '-'*25)
-            print('Question :' + question)
-            print('Model Response: ' + response)
-            print('Answer: ' + answer)
-            print(' CORRECT? : ' + check_response(response,answer))
-            print('-'*23 + 'end DEBUG MODEL RESPONSE' + '-'*23)
-        ans = check_response(response,answer)
+    if isDecoder:
+        responses = infer(model,tokenizer,[t[0] for t in tests],left=True)
+    else:
+        responses = infer(model,tokenizer,[t[0] for t in tests])
+
+    correct = [t[1] for t in tests]
+
+    for i in range(len(responses)):
+        ans = check_response(responses[i],correct[i])
+        if ans == INVALD_RESPONSE:
+            print('-'*25 + 'invalid response'+'-'*25)
+            print(responses[i])
+            print(correct[i])
+            print('-'*23 + '/ invalid response'+'-'*23)
         counts[ans] += 1
-
+    
     with open(outpath, 'w') as f:
         for key, value in counts.items():
             f.write(f"{key}: {value}\n")
 
-    print('done!')
+    print('#'*25 + ' Trial Done ' + '#'*25)
 
 if __name__ == "__main__":
     ### cli functionality here. 
-    main()
+    argvs = parse_args()
+    loop = argvs.l
+    if loop == 0:
+        main(argvs,argvs.t)
+    else:
+        i = 0
+        while i < loop:
+            print(f'Trial : {i}')
+            main(argvs,i)
+            i += 1
