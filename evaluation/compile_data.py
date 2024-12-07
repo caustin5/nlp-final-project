@@ -1,5 +1,7 @@
 import os
 import argparse
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 INVALID_RESPONSE = "<inv>:"
 VALID_CORRECT = "<vc>:"
@@ -23,6 +25,11 @@ def main():
     dir_in_str = args.directory
 
     results = []
+    sum_accuracies = {}
+
+    fig, axes = plt.subplots(1,2)
+    i = 0
+
 
     for sub_dir_in_str in os.listdir(dir_in_str):
         total = 0
@@ -30,6 +37,7 @@ def main():
         total_incorrect = 0
 
         result = {}
+        accuracies = []
 
 
         for filename in os.listdir(dir_in_str + "\\" + sub_dir_in_str):
@@ -47,6 +55,7 @@ def main():
                             l = l.strip()
                             total += int(l)
                             total_correct += int(l)
+                            accuracies.append(int(l))
 
                         if line.startswith(VALID_INCORRECT):
                             l = line.replace(VALID_INCORRECT,"")
@@ -55,18 +64,31 @@ def main():
                             total_incorrect += int(l)
             else:
                 continue
+        sns.histplot(accuracies,kde=True,ax=axes[i])
+        i+=1
+
 
         result["title"] = sub_dir_in_str
         result["total"] = total
         result["total_correct"] = total_correct
         result["total_incorrect"] = total_incorrect
+        if total > 0:
+            result["accuracy"] = total_correct/total
+        else:
+            result["accuracy"] = 0
+
+        sum_accuracies[sub_dir_in_str] = result["accuracy"]
 
         results.append(result) 
+    
+    plt.show()
 
-        print(results)
+    plt.figure()
+    sns.barplot(sum_accuracies)
+    plt.show()
 
-if __name__=="main":
-    main()
+    
+main()
 
 
 

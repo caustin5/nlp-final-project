@@ -7,3 +7,5 @@ torchaudio --index-url https://download.pytorch.org/whl/cu118
 transformers
 tqdm
 huggingface_hub
+seaborn
+matplotlib
