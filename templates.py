@@ -6,6 +6,8 @@ Created on Tue Nov 19 07:01:33 2024
 """
 
 from random import randint
+import argparse
+import json
 
 class Template:
     def __init__(self, original_q, original_a, marked_q, marked_a):
@@ -15,6 +17,26 @@ class Template:
         self.marked_a = marked_a
 
         self.names = ["Alex", "Sam", "Jessie", "Cameron", "Charlie", "Pat"]
+
+        # I recognize that selecting names as male and female is not great, or maybe right,
+        # but LLM's aren't equitable and understanding -- hopefully this can improve
+        # performance. 
+        self.names_male = [ "Alex", "Jordan", "Taylor", "Casey", "Riley", "Jamie", "Parker", "Rowan", 
+                            "Reese", "Drew", "Emerson", "Hayden", "Charlie", "Sawyer", "Dakota", "Finley", 
+                            "Micah", "Sam", "Shay", "Elliot", "Phoenix", "Terry", "Robin", "Cameron", 
+                            "Kai", "Payton", "Devon", "Blake", "Toby", "Adrian", "August", "Ari", 
+                            "Lennon", "Brett", "Francis", "Kendall", "Rowe", "Monroe", "Ash", "Case", 
+                            "Justice", "Jesse", "Alden", "Linden", "Luca", "Keegan", "Spencer", "Chandler", 
+                            "Frankie", "Rory", "Gray", "Lane", "Arlo", "Corey", "Kieran", "Hunter", "Shane", 
+                            "Cypress", "Quincy"
+                            ]
+        self.names_female = ["Alex", "Jordan", "Taylor", "Morgan", "Casey", "Avery", "Riley", "Jamie", 
+                            "Quinn", "Skylar", "Reese", "Emerson", "Hayden", "Blair", "Dakota", "Arden", 
+                            "Jules", "Sage", "River", "Shay", "Leslie", "Terry", "Robin", "Harper", 
+                            "Payton", "Hollis", "Kennedy", "August", "Lennon", "Marley", "Kendall", "Eden", 
+                            "Rowe", "Shiloh", "Marlowe", "Ellis", "Aspen", "London", "Justice", "Jesse", 
+                            "Tatum", "Wren", "Mackenzie", "Addison", "Oakley", "Sky", "Sloan", "Darcy", 
+                            "Reagan", "Frankie", "Leighton", "Sasha", "Bailey", "Presley", "Sasha", "Scout"]
 
         self.dists = []
     
@@ -45,7 +67,7 @@ def create_templates():
     templates[0].add_dist(lambda t,x: randint(1,100)*x[1])
     templates[0].add_dist(lambda t,x: x[2]//x[1])
     templates[0].add_dist(lambda t,x: x[2]+x[3])
-    templates[0].add_dist(lambda t,x: t.names[randint(0,len(t.names)-1)])
+    templates[0].add_dist(lambda t,x: t.names_female[randint(0,len(t.names_female)-1)])
 
     original_q = '''Weng earns $12 an hour for babysitting. Yesterday, she just did 50 minutes of babysitting. How much did she earn?'''
     original_a = '''Weng earns 12/60 = $<<12/60=0.2>>0.2 per minute.
@@ -60,7 +82,7 @@ def create_templates():
     templates[1].add_dist(lambda t,x: randint(1,10)*10)
     templates[1].add_dist(lambda t,x: x[1]/60)
     templates[1].add_dist(lambda t,x: int(x[2]*x[1]))
-    templates[1].add_dist(lambda t,x: t.names[randint(0,len(t.names)-1)])
+    templates[1].add_dist(lambda t,x: t.names_female[randint(0,len(t.names_female)-1)])
 
 
     original_q = '''Betty is saving money for a new wallet which costs $100. Betty has only half of the money she needs. Her parents decided to give her $15 for that purpose, and her grandparents twice as much as her parents. How much more money does Betty need to buy the wallet?'''
@@ -83,7 +105,7 @@ def create_templates():
     templates[2].add_dist(lambda t,x: x[4]//x[1])
     templates[2].add_dist(lambda t,x: x[5]*x[3])
     templates[2].add_dist(lambda t,x: x[4]-x[6]-x[7]-x[5])
-    templates[2].add_dist(lambda t,x: t.names[randint(0,len(t.names)-1)])
+    templates[2].add_dist(lambda t,x: t.names_female[randint(0,len(t.names_female)-1)])
 
     original_q = '''Julie is reading a 120-page book. Yesterday, she was able to read 12 pages and today, she read twice as many pages as yesterday. If she wants to read half of the remaining pages tomorrow, how many pages should she read?'''
     original_a =  '''Julie read 12 x 2 = <<12*2=24>>24 pages today.
@@ -108,7 +130,7 @@ def create_templates():
     templates[3].add_dist(lambda t,x: randint(x[6]//x[3],x[6]//x[3]+20)*x[1]*x[3])
     templates[3].add_dist(lambda t,x: x[7]-x[6])
     templates[3].add_dist(lambda t,x: x[8]//x[3])
-    templates[3].add_dist(lambda t,x: t.names[randint(0,len(t.names)-1)])
+    templates[3].add_dist(lambda t,x: t.names_female[randint(0,len(t.names_female)-1)])
 
     original_q = '''James writes a 3-page letter to 2 different friends twice a week.  How many pages does he write a year?'''
     original_a =  '''He writes each friend 3*2=<<3*2=6>>6 pages a week
@@ -130,7 +152,7 @@ def create_templates():
     templates[4].add_dist(lambda t,x: x[2]*x[5])
     templates[4].add_dist(lambda t,x: x[6]*x[3])
     templates[4].add_dist(lambda t,x: x[7]*x[1])
-    templates[4].add_dist(lambda t,x: t.names[randint(0,len(t.names)-1)])
+    templates[4].add_dist(lambda t,x: t.names_male[randint(0,len(t.names_male)-1)])
 
     original_q = '''Mark has a garden with flowers. He planted plants of three different colors in it. Ten of them are yellow, and there are 80% more of those in purple. There are only 25% as many green flowers as there are yellow and purple flowers. How many flowers does Mark have in his garden?'''
     original_a =  '''There are 80/100 * 10 = <<80/100*10=8>>8 more purple flowers than yellow flowers.
@@ -156,7 +178,7 @@ def create_templates():
     templates[5].add_dist(lambda t,x: 25*randint(1,3))
     templates[5].add_dist(lambda t,x: x[6]*x[5]//100)
     templates[5].add_dist(lambda t,x: x[5]+x[7])
-    templates[5].add_dist(lambda t,x: t.names[randint(0,len(t.names)-1)])
+    templates[5].add_dist(lambda t,x: t.names_male[randint(0,len(t.names_male)-1)])
 
     original_q = '''Albert is wondering how much pizza he can eat in one day. He buys 2 large pizzas and 2 small pizzas. A large pizza has 16 slices and a small pizza has 8 slices. If he eats it all, how many pieces does he eat that day?'''
     original_a =  '''He eats 32 from the largest pizzas because 2 x 16 = <<2*16=32>>32
@@ -176,7 +198,7 @@ def create_templates():
     templates[6].add_dist(lambda t,x: x[0]*x[2])
     templates[6].add_dist(lambda t,x: x[1]*x[3])
     templates[6].add_dist(lambda t,x: x[4]+x[5])
-    templates[6].add_dist(lambda t,x: t.names[randint(0,len(t.names)-1)])
+    templates[6].add_dist(lambda t,x: t.names_male[randint(0,len(t.names_male)-1)])
 
     original_q = '''Ken created a care package to send to his brother, who was away at boarding school.  Ken placed a box on a scale, and then he poured into the box enough jelly beans to bring the weight to 2 pounds.  Then, he added enough brownies to cause the weight to triple.  Next, he added another 2 pounds of jelly beans.  And finally, he added enough gummy worms to double the weight once again.  What was the final weight of the box of goodies, in pounds?'''
     original_a =  '''To the initial 2 pounds of jelly beans, he added enough brownies to cause the weight to triple, bringing the weight to 2*3=<<2*3=6>>6 pounds.
@@ -190,7 +212,7 @@ def create_templates():
     #### {10:d}'''
     templates.append(Template(original_q, original_a,  marked_q, marked_a))
     templates[7].add_dist(lambda t,x: ["brother", "sister", "cousin", "friend"][randint(0,3)])
-    templates[7].add_dist(lambda t,x: t.names[randint(0,len(t.names)-1)])
+    templates[7].add_dist(lambda t,x: t.names_male[randint(0,len(t.names_male)-1)])
     templates[7].add_dist(lambda t,x: randint(2, 5))
     templates[7].add_dist(lambda t,x: ["double", "triple", "quadruple"][randint(0,2)])
     templates[7].add_dist(lambda t,x: ["double", "triple", "quadruple"].index(x[3])+2)
@@ -214,7 +236,7 @@ def create_templates():
     Thus, {0:s} paid {1:s} = {10:d} - {7:d} = $<<{10:d}-{7:d}={9:d}>>{9:d} for the shoes. 
     #### {9:d}'''
     templates.append(Template(original_q, original_a,  marked_q, marked_a))
-    templates[8].add_dist(lambda t,x: t.names[randint(0,len(t.names)-1)])
+    templates[8].add_dist(lambda t,x: t.names_female[randint(0,len(t.names_female)-1)])
     templates[8].add_dist(lambda t,x: ["A","a","B","b","C","c","S","s", "X", "x","y", "y","Z", "z"][randint(0,13)])
     templates[8].add_dist(lambda t,x: randint(20,50))
     templates[8].add_dist(lambda t,x: randint(30,80))
@@ -259,7 +281,7 @@ def create_templates():
     templates[9].add_dist(lambda t,x: x[8]*x[4])
     templates[9].add_dist(lambda t,x: x[9]*x[3])
     templates[9].add_dist(lambda t,x: x[6]+x[10])
-    templates[9].add_dist(lambda t,x: t.names[randint(0,len(t.names)-1)])
+    templates[9].add_dist(lambda t,x: t.names_female[randint(0,len(t.names_female)-1)])
 
 
     original_q = '''A deep-sea monster rises from the waters once every hundred years to feast on a ship and sate its hunger. Over three hundred years, it has consumed 847 people. Ships have been built larger over time, so each new ship has twice as many people as the last ship. How many people were on the ship the monster ate in the first hundred years?'''
@@ -313,7 +335,7 @@ def create_templates():
     templates[11].add_dist(lambda t,x: x[9]+x[5]+x[6])
     templates[11].add_dist(lambda t,x: randint(1,20))
     templates[11].add_dist(lambda t,x: x[10]-x[11])
-    templates[11].add_dist(lambda t,x: t.names[randint(0,len(t.names)-1)])
+    templates[11].add_dist(lambda t,x: t.names_male[randint(0,len(t.names_male)-1)])
 
     original_q = '''Randy has 60 mango trees on his farm. He also has 5 less than half as many coconut trees as mango trees. How many trees does Randy have in all on his farm?'''
     original_a =  '''Half of the number of Randy's mango trees is 60/2 = <<60/2=30>>30 trees.
@@ -326,7 +348,7 @@ def create_templates():
     Therefore, {0:s} has {3:d} + {6:d} = <<{3:d}+{6:d}={7:d}>>{7:d} trees on his farm.
     #### {7:d}'''
     templates.append(Template(original_q, original_a,  marked_q, marked_a))
-    templates[12].add_dist(lambda t,x: t.names[randint(0,len(t.names)-1)])
+    templates[12].add_dist(lambda t,x: t.names_male[randint(0,len(t.names_male)-1)])
     templates[12].add_dist(lambda t,x: ["half", "a third", "a quarter"][randint(0,2)])
     templates[12].add_dist(lambda t,x: ["half", "a third", "a quarter"].index(x[1])+2)
     templates[12].add_dist(lambda t,x: randint(2,30)*x[2])
@@ -346,7 +368,7 @@ def create_templates():
     {0:s} spent ${4:d} + ${3:d} + ${8:d} = $<<{4:d}+{3:d}+{8:d}={9:d}>>{9:d} on the ingredients.
     #### {9:d}'''
     templates.append(Template(original_q, original_a,  marked_q, marked_a))
-    templates[13].add_dist(lambda t,x: t.names[randint(0,len(t.names)-1)])
+    templates[13].add_dist(lambda t,x: t.names_male[randint(0,len(t.names_male)-1)])
     templates[13].add_dist(lambda t,x: ["half", "a third", "a quarter"][randint(0,2)])
     templates[13].add_dist(lambda t,x: ["half", "a third", "a quarter"].index(x[1])+2)
     templates[13].add_dist(lambda t,x: randint(1, 10))
@@ -374,7 +396,7 @@ def create_templates():
     templates[14].add_dist(lambda t,x: x[1]*x[2])
     templates[14].add_dist(lambda t,x: randint(2, 8))
     templates[14].add_dist(lambda t,x: x[3]*x[4])
-    templates[14].add_dist(lambda t,x: t.names[randint(0,len(t.names)-1)])
+    templates[14].add_dist(lambda t,x: t.names_female[randint(0,len(t.names_female)-1)])
 
     original_q = '''James creates a media empire.  He creates a movie for $2000.  Each DVD cost $6 to make.  He sells it for 2.5 times that much.  He sells 500 movies a day for 5 days a week.  How much profit does he make in 20 weeks?'''
     original_a =  '''He sold each DVD for 6*2.5=$<<6*2.5=15>>15
@@ -393,7 +415,7 @@ def create_templates():
     Then after the cost of creating the movie he has a profit of {11:d}-{1:d}=$<<{11:d}-{1:d}={12:d}>>{12:d}
     #### {12:d}'''
     templates.append(Template(original_q, original_a,  marked_q, marked_a))
-    templates[15].add_dist(lambda t,x: t.names[randint(0,len(t.names)-1)])
+    templates[15].add_dist(lambda t,x: t.names_male[randint(0,len(t.names_male)-1)])
     templates[15].add_dist(lambda t,x: randint(1,10)*1000)
     templates[15].add_dist(lambda t,x: randint(1,5)*2)
     templates[15].add_dist(lambda t,x: randint(1,4)+0.5)
@@ -420,8 +442,8 @@ def create_templates():
     After buying the shirt he will have ${5:d}-${7:d} = $<<{5:d}-{7:d}={8:d}>>{8:d} left
     #### {8:d}'''
     templates.append(Template(original_q, original_a,  marked_q, marked_a))
-    templates[16].add_dist(lambda t,x: t.names[randint(0,len(t.names)-1)])
-    templates[16].add_dist(lambda t,x: [name for name in t.names if name != x[0] ][randint(0,len(t.names)-2)])
+    templates[16].add_dist(lambda t,x: t.names_male[randint(0,len(t.names_male)-1)])
+    templates[16].add_dist(lambda t,x: [name for name in t.names_male if name != x[0] ][randint(0,len(t.names_male)-2)])
     templates[16].add_dist(lambda t,x: randint(2,6))
     templates[16].add_dist(lambda t,x: randint(2,6))
     templates[16].add_dist(lambda t,x: randint(100,1000))
@@ -460,8 +482,8 @@ def create_templates():
     templates[17].add_dist(lambda t,x: x[8]+x[9])
     templates[17].add_dist(lambda t,x: randint(2, 30))
     templates[17].add_dist(lambda t,x: x[7]+x[11])
-    templates[17].add_dist(lambda t,x: t.names[randint(0,len(t.names)-1)])
-    templates[17].add_dist(lambda t,x: [name for name in t.names if name != x[13] ][randint(0,len(t.names)-2)])
+    templates[17].add_dist(lambda t,x: t.names_male[randint(0,len(t.names_male)-1)])
+    templates[17].add_dist(lambda t,x: [name for name in t.names_male if name != x[13] ][randint(0,len(t.names_male)-2)])
 
     original_q = '''It takes Roque two hours to walk to work and one hour to ride his bike to work. Roque walks to and from work three times a week and rides his bike to and from work twice a week. How many hours in total does he take to get to and from work a week with walking and biking?'''
     original_a =  '''Roque takes 2*3 = <<2*3=6>>6 hours a week to walk to work.
@@ -492,7 +514,7 @@ def create_templates():
     templates[18].add_dist(lambda t,x: x[7]*x[8])
     templates[18].add_dist(lambda t,x: x[10]*2)
     templates[18].add_dist(lambda t,x: x[5]+x[11])
-    templates[18].add_dist(lambda t,x: t.names[randint(0,len(t.names)-1)])
+    templates[18].add_dist(lambda t,x: t.names_male[randint(0,len(t.names_male)-1)])
 
     original_q = '''Tim rides his bike back and forth to work for each of his 5 workdays.  His work is 20 miles away.  He also goes for a weekend bike ride of 200 miles.    If he can bike at 25 mph how much time does he spend biking a week?'''
     original_a =  '''He bikes 20*2=<<20*2=40>>40 miles each day for work
@@ -507,7 +529,7 @@ def create_templates():
     So he bikes a total of {3:d}/{2:d}=<<{3:d}/{2:d}={1:d}>>{1:d} hours
     #### {1:d}'''
     templates.append(Template(original_q, original_a,  marked_q, marked_a))
-    templates[19].add_dist(lambda t,x: t.names[randint(0,len(t.names)-1)])
+    templates[19].add_dist(lambda t,x: t.names_male[randint(0,len(t.names_male)-1)])
     templates[19].add_dist(lambda t,x: randint(5,25))
     templates[19].add_dist(lambda t,x: randint(5,30))
     templates[19].add_dist(lambda t,x: x[1]*x[2])
@@ -533,7 +555,7 @@ def create_templates():
     templates[20].add_dist(lambda t,x: randint(2, x[2]))
     templates[20].add_dist(lambda t,x: x[2]-x[3])
     templates[20].add_dist(lambda t,x: x[0]+x[2]+x[3])
-    templates[20].add_dist(lambda t,x: t.names[randint(0,len(t.names)-1)])
+    templates[20].add_dist(lambda t,x: t.names_female[randint(0,len(t.names_female)-1)])
 
     original_q = '''Each bird eats 12 beetles per day, each snake eats 3 birds per day, and each jaguar eats 5 snakes per day. If there are 6 jaguars in a forest, how many beetles are eaten each day?'''
     original_a =  '''First find the total number of snakes eaten: 5 snakes/jaguar * 6 jaguars = <<5*6=30>>30 snakes
@@ -563,9 +585,9 @@ def create_templates():
     {0:s}’s last name is {9:d} letters shorter than {0:s}’s, so there are {8:d} - {9:d} = <<{8:d}-{9:d}={10:d}>>{10:d} letters in {0:s}’s last name.
     #### {10:d}'''
     templates.append(Template(original_q, original_a,  marked_q, marked_a))
-    templates[22].add_dist(lambda t,x: t.names[randint(0,len(t.names)-1)])
-    templates[22].add_dist(lambda t,x: [name for name in t.names if name != x[0] ][randint(0,len(t.names)-2)])
-    templates[22].add_dist(lambda t,x: [name for name in t.names if ((name != x[0]) and (name != x[1]))][randint(0,len(t.names)-3)])
+    templates[22].add_dist(lambda t,x: t.names_female[randint(0,len(t.names_female)-1)])
+    templates[22].add_dist(lambda t,x: [name for name in t.names_female if name != x[0] ][randint(0,len(t.names_female)-2)])
+    templates[22].add_dist(lambda t,x: [name for name in t.names_female if ((name != x[0]) and (name != x[1]))][randint(0,len(t.names_female)-3)])
     templates[22].add_dist(lambda t,x: ["Ngo","Adam", "Black", "Austin", "Zickert", "Smithson", "Christoph"][randint(0,6)])
     templates[22].add_dist(lambda t,x:  ["Ngo","Adam", "Black", "Austin", "Zickert", "Smithson","Christoph"].index(x[3])+3)
     templates[22].add_dist(lambda t,x: randint(2,10))
@@ -590,7 +612,7 @@ def create_templates():
     She bought {8:d} tops for a total of ${10:d} so {10:d}/{8:d} = ${9:d} 
     #### {9:d}'''
     templates.append(Template(original_q, original_a,  marked_q, marked_a))
-    templates[23].add_dist(lambda t,x: t.names[randint(0,len(t.names)-1)])
+    templates[23].add_dist(lambda t,x: t.names_female[randint(0,len(t.names_female)-1)])
     templates[23].add_dist(lambda t,x: randint(2, 10))
     templates[23].add_dist(lambda t,x: randint(5, 20))
     templates[23].add_dist(lambda t,x: x[1]*x[2])
@@ -612,7 +634,7 @@ def create_templates():
     So she still needs to pay ${4:d}-${3:d}=$<<{4:d}-{3:d}={5:d}>>{5:d}
     #### {5:d}'''
     templates.append(Template(original_q, original_a,  marked_q, marked_a))
-    templates[24].add_dist(lambda t,x: t.names[randint(0,len(t.names)-1)])
+    templates[24].add_dist(lambda t,x: t.names_female[randint(0,len(t.names_female)-1)])
     templates[24].add_dist(lambda t,x: randint(1,100))
     templates[24].add_dist(lambda t,x: randint(1,100))
     templates[24].add_dist(lambda t,x: x[1]+x[2])
@@ -621,5 +643,28 @@ def create_templates():
 
     return templates
 
-templates = create_templates()
-print(templates[12].generate_question())
+
+# print(templates[12].generate_question())
+
+if __name__ == "__main__":
+    # so we can just call from cli to generate json (cdz)
+    templates = create_templates()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-n",
+                        type=int,
+                        default=50,
+                        help="number of samples for each qtype.")
+    argvs = parser.parse_args()
+
+    qa_json = []
+
+    print(len(templates))
+    for temp in templates:
+        temp_qa = {}
+        for i in range(argvs.n):
+            question,answer = temp.generate_question()
+            temp_qa[f'question_{i+1}'] = question
+            temp_qa[f'answer_{i+1}'] = answer
+        qa_json.append(temp_qa)
+    with open(f'gsm_symbolic_1-25_n={argvs.n}.json','w') as file:
+        json.dump(qa_json, file, indent=4)
