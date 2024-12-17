@@ -1,28 +1,21 @@
 """ (cdz) fine-tuning a model on gsm-symbolic (our version) """
 
-
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig, TrainingArguments
 from transformers import pipeline, logging
-from peft import LoraConfig
 import torch
 from tqdm import tqdm
 from huggingface_hub import login
 from transformers.models.gemma2.modeling_gemma2 import Gemma2ForCausalLM
-from peft import get_peft_model
 from datasets import Dataset
 from transformers import Trainer, TrainingArguments, DataCollatorForLanguageModeling
 import os
 import argparse
 import transformers
-import peft
 import re
 import random
 import json
 import time
 import typing
-from torch.amp import autocast
-import bitsandbytes as bnb
-from trl import SFTTrainer
 from functools import partial
 
 ### CoT Prompt String.
@@ -47,7 +40,7 @@ COT_PROMPT = preamble+'\n'+q1+'\n'+q2+'\n'+q3+'\n'
 LTSBS = "Let's think step by step. "
 
 DEVICE = "cuda"
-HF_TOKEN = "" # replace with your hf login token :)
+HF_TOKEN = "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" # replace with your hf login token :)
 MODEL = 'google/gemma-2-2b-it'
 MODEL_FT = 'gemma-2-2b-it-gsmsymbolic'
 
@@ -262,6 +255,9 @@ def main():
             )
     tokenized_dataset = tokenized_dataset.train_test_split(test_size=0.2)
 
+    reduction_factor = 0.20  # Keep 25% of the original training data
+    train_subset_size = int(len(tokenized_dataset['train']) * reduction_factor)
+    tokenized_dataset['train'] = tokenized_dataset['train'].select(range(train_subset_size))
     # setting up finetune
 
     training_args = TrainingArguments(
@@ -286,12 +282,17 @@ def main():
         data_collator = data_collator
         )
     
+    
     print('-'*25 + ' Fine-tuning! ' + '-'*25)
     trainer.train()
     print('-'*22 + ' Finished Fine-tuning ' + '-'*22)
 
     
     trainer.save_model('./results/fine_tuned_test1')
+    print('-'*25 + ' HF Model Saved' + '-'*25)
+    torch.save(model.state_dict(), './results/fine_tuned_test1/lora_finetuned_model.pt')
+    print('-'*23 + ' LoRA Model Saved' + '-'*23)
+
 
 if __name__ == "__main__":
     main()
