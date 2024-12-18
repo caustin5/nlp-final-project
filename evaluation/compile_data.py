@@ -22,6 +22,7 @@ def parse_args():
 
 def main():
 
+
     args = parse_args()
     dir_in_str = args.directory
 
@@ -58,7 +59,7 @@ def main():
     for i in range(3):
         for j in range(4):
             tuples.append((i,j))
-            titles.append(datas[i] + ": " + models[j])
+            titles.append(models[j])
 
 
     i = 0
@@ -107,7 +108,7 @@ def main():
                 else:
                     continue
 
-            sns.histplot(accuracies,kde=True,ax=axes[tuples[i][0],tuples[i][1]], bins=[0,.1,.2,.3,.4,.5,.6,.7,.8])
+            sns.histplot(accuracies,kde=True,ax=axes[tuples[i][0],tuples[i][1]], bins=8, binrange=[0,.8])
 
 
             result["title"] = sub_dir_data + ": " + sub_dir_model
@@ -122,7 +123,7 @@ def main():
 
 
             sum_accuracies.append(result["accuracy"])
-            hues.append(j)
+            hues.append(datas[j])
             
             i+=1
 
@@ -136,12 +137,33 @@ def main():
     plt.show()
 
     d = {"title": titles, "accuracy": sum_accuracies, "hues": hues}
-    data = pd.DataFrame(data = d)
+    data1 = pd.DataFrame(data = d)
 
-    hue_map = {0:"red", 1:"yellow", 2:"black"}
+    print(data1)
+
+    hue_map = {datas[0]:"red", datas[1]:"yellow", datas[2]:"black"}
 
     plt.figure()
-    sns.barplot(data,x="accuracy", y="title",hue=hues, palette=hue_map, legend=False)
+    sns.barplot(data1,x="accuracy", y="title",hue=hues, palette=hue_map, legend=True)
+    plt.ylabel("Language Model")
+    plt.show()
+
+    diffs = []
+    for i in range(4):
+        print(data1.loc[4+i,"accuracy"])
+        diffs.append(data1.loc[8+i,"accuracy"] - data1.loc[4+i,"accuracy"])
+
+    print(diffs)
+
+    e = {"title": models, "diff": diffs}
+    data2 = pd.DataFrame(data = e)
+
+
+    plt.figure()
+    sns.barplot(data2,x="title", y="diff")
+    plt.xlabel("Language Model")
+    plt.ylabel("%")
+    plt.title("Drop in Accuracy from GSM to GSM-Symbolic")
     plt.show()
 
     
